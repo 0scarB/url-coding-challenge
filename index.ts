@@ -160,11 +160,13 @@ async function update() {
     }
 
     // Throttle requests and schedule them for later with setTimeout, if needed ...
-    const requestTimestampDelta = Date.now() - requestTimestamp;
+    const timestamp = Date.now();
     // NOTE: clearTimeout does nothing if doRequestTimeoutId is not an active timeout ID
     clearTimeout(doRequestTimeoutId);
-    if (requestTimestampDelta < API_THROTTLE_INTERVAL_IN_MS) {
-        doRequestTimeoutId = setTimeout(doRequest, requestTimestampDelta);
+    if (timestamp - requestTimestamp < API_THROTTLE_INTERVAL_IN_MS) {
+        doRequestTimeoutId =
+            setTimeout(doRequest,
+                       requestTimestamp + API_THROTTLE_INTERVAL_IN_MS - timestamp);
         state = State.REQUEST_THROTTLED;
         updateUi();
         return;

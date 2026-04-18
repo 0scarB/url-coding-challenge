@@ -193,7 +193,7 @@ function doRequest() {
 }
 function update() {
     return __awaiter(this, void 0, void 0, function () {
-        var url, urlObj, requestTimestampDelta;
+        var url, urlObj, timestamp;
         return __generator(this, function (_a) {
             url = inputEl.value;
             // Check the URL's format
@@ -210,11 +210,12 @@ function update() {
                 updateUi();
                 return [2 /*return*/];
             }
-            requestTimestampDelta = Date.now() - requestTimestamp;
+            timestamp = Date.now();
             // NOTE: clearTimeout does nothing if doRequestTimeoutId is not an active timeout ID
             clearTimeout(doRequestTimeoutId);
-            if (requestTimestampDelta < API_THROTTLE_INTERVAL_IN_MS) {
-                doRequestTimeoutId = setTimeout(doRequest, requestTimestampDelta);
+            if (timestamp - requestTimestamp < API_THROTTLE_INTERVAL_IN_MS) {
+                doRequestTimeoutId =
+                    setTimeout(doRequest, requestTimestamp + API_THROTTLE_INTERVAL_IN_MS - timestamp);
                 state = State.REQUEST_THROTTLED;
                 updateUi();
                 return [2 /*return*/];
