@@ -40,24 +40,28 @@ var State;
     State[State["EMPTY_URL"] = 0] = "EMPTY_URL";
     State[State["NOT_HTTP_OR_HTTPS"] = 1] = "NOT_HTTP_OR_HTTPS";
     State[State["INVALID_FORMAT"] = 2] = "INVALID_FORMAT";
-    State[State["NOT_FOUND"] = 3] = "NOT_FOUND";
+    State[State["REQUEST_THROTTLED"] = 3] = "REQUEST_THROTTLED";
     State[State["AWAITING_API_URL_TYPE_RESPONSE"] = 4] = "AWAITING_API_URL_TYPE_RESPONSE";
-    State[State["POINTS_TO_FILE"] = 5] = "POINTS_TO_FILE";
-    State[State["POINTS_TO_DIR"] = 6] = "POINTS_TO_DIR";
-    State[State["BUG"] = 7] = "BUG";
+    State[State["NOT_FOUND"] = 5] = "NOT_FOUND";
+    State[State["POINTS_TO_FILE"] = 6] = "POINTS_TO_FILE";
+    State[State["POINTS_TO_DIR"] = 7] = "POINTS_TO_DIR";
+    State[State["BUG"] = 8] = "BUG";
 })(State || (State = {}));
 var MOCK_FETCH = true;
-var MOCK_FETCH_DELAY = 1000;
+var MOCK_FETCH_DELAY_IN_MS = 1000;
 var MOCK_FETCH_EXISTENT_DOMAINS = ["exists.com", "tuta.com", "xkcd.com", "google.com"];
 var MOCK_FETCH_DIR_SUFFIX = "/";
 var HTTP_STATUS_OK = 200;
 var HTTP_STATUS_NOT_FOUND = 404;
+var API_THROTTLE_INTERVAL_IN_MS = 2000;
 var API_BASE_URL = "https://bogus.com/api/";
 var API_URL_TYPE_ENDPOINT_PATH = "url-type";
 var inputEl = document.getElementById("url-input");
 var pendingStatusMsgEl = document.getElementById("url-input-pending-status-msg");
 var successStatusMsgEl = document.getElementById("url-input-success-status-msg");
 var state = State.EMPTY_URL;
+var requestTimestamp = -1;
+var doRequestTimeoutId = -1;
 function delay(milliseconds) {
     return __awaiter(this, void 0, void 0, function () {
         return __generator(this, function (_a) {
@@ -70,20 +74,25 @@ function fetchMock(url, options) {
         var urlToCheck;
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0: return [4 /*yield*/, delay(MOCK_FETCH_DELAY)];
+                case 0:
+                    console.info("Mock fetch(\"".concat(url, "\", ").concat(JSON.stringify(options), ")"));
+                    return [4 /*yield*/, delay(MOCK_FETCH_DELAY_IN_MS)];
                 case 1:
                     _a.sent();
                     urlToCheck = options.body;
                     if (MOCK_FETCH_EXISTENT_DOMAINS.includes(new URL(urlToCheck).hostname)) {
                         if (urlToCheck.endsWith(MOCK_FETCH_DIR_SUFFIX)) {
+                            console.info("Mock response body: dir");
                             return [2 /*return*/, new Response("dir")];
                         }
                         else {
+                            console.info("Mock response body: file");
                             return [2 /*return*/, new Response("file")];
                         }
                     }
                     else {
-                        throw { status: 404 };
+                        console.info("Mock response: 404 Not Found");
+                        throw { status: HTTP_STATUS_NOT_FOUND };
                     }
                     return [2 /*return*/];
             }
@@ -103,6 +112,9 @@ function updateUi() {
         case State.INVALID_FORMAT:
             inputEl.setCustomValidity("Invalid URL format!");
             break;
+        case State.REQUEST_THROTTLED:
+            pendingStatusMsgEl.textContent = "Checking URL existence... (Throttling)";
+            break;
         case State.AWAITING_API_URL_TYPE_RESPONSE:
             pendingStatusMsgEl.textContent = "Checking URL existence...";
             break;
@@ -121,34 +133,19 @@ function updateUi() {
     }
     inputEl.reportValidity();
 }
-function update() {
+function doRequest() {
     return __awaiter(this, void 0, void 0, function () {
-        var url, urlObj, responseStatus, responseBody, responsePromise, response, error_1;
+        var url, responseStatus, responseBody, responsePromise, response, error_1;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     url = inputEl.value;
-                    //
-                    // Check URL Format
-                    //
-                    try {
-                        urlObj = new URL(url);
-                        if (urlObj.protocol !== "https:" && urlObj.protocol !== "http:") {
-                            state = State.NOT_HTTP_OR_HTTPS;
-                            updateUi();
-                            return [2 /*return*/];
-                        }
-                    }
-                    catch (error) {
-                        state = State.INVALID_FORMAT;
-                        updateUi();
-                        return [2 /*return*/];
-                    }
                     responseStatus = -1;
                     responseBody = "";
                     _a.label = 1;
                 case 1:
                     _a.trys.push([1, 5, , 6]);
+                    requestTimestamp = Date.now();
                     responsePromise = (MOCK_FETCH ? fetchMock : fetch)(API_BASE_URL + API_URL_TYPE_ENDPOINT_PATH, {
                         method: "POST",
                         headers: { "Content-Type": "text/plain" },
@@ -171,6 +168,9 @@ function update() {
                     responseStatus = error_1.status;
                     return [3 /*break*/, 6];
                 case 6:
+                    // Return early, if the URL no longer matches the most recent input
+                    if (url !== inputEl.value)
+                        return [2 /*return*/];
                     if (responseStatus === HTTP_STATUS_OK && responseBody === "file") {
                         state = State.POINTS_TO_FILE;
                     }
@@ -182,11 +182,46 @@ function update() {
                     }
                     else {
                         state = State.BUG;
+                        updateUi();
                         return [2 /*return*/];
                     }
                     updateUi();
                     return [2 /*return*/];
             }
+        });
+    });
+}
+function update() {
+    return __awaiter(this, void 0, void 0, function () {
+        var url, urlObj, requestTimestampDelta;
+        return __generator(this, function (_a) {
+            url = inputEl.value;
+            // Check the URL's format
+            try {
+                urlObj = new URL(url);
+                if (urlObj.protocol !== "https:" && urlObj.protocol !== "http:") {
+                    state = State.NOT_HTTP_OR_HTTPS;
+                    updateUi();
+                    return [2 /*return*/];
+                }
+            }
+            catch (error) {
+                state = State.INVALID_FORMAT;
+                updateUi();
+                return [2 /*return*/];
+            }
+            requestTimestampDelta = Date.now() - requestTimestamp;
+            // NOTE: clearTimeout does nothing if doRequestTimeoutId is not an active timeout ID
+            clearTimeout(doRequestTimeoutId);
+            if (requestTimestampDelta < API_THROTTLE_INTERVAL_IN_MS) {
+                doRequestTimeoutId = setTimeout(doRequest, requestTimestampDelta);
+                state = State.REQUEST_THROTTLED;
+                updateUi();
+                return [2 /*return*/];
+            }
+            // ... otherwise, do the request immediately
+            doRequest();
+            return [2 /*return*/];
         });
     });
 }
