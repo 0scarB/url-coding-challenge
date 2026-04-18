@@ -1,6 +1,22 @@
 <!DOCTYPE HTML>
 <html>
+    <head>
+        <style>
+            #url-input:invalid {
+                border: none;
+                outline: 2px solid red;
+            }
+
+            #url-input-success-status-msg {
+                color: green;
+            }
+        </style>
+    </head>
     <body>
+        <input type="url" id="url-input" placeholder="Enter URL"></input>
+        <br>
+        <span id="url-input-success-status-msg"></span>
+
         <script src="index.js"></script>
     </body>
 </html>
