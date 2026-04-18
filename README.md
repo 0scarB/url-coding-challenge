@@ -1,5 +1,7 @@
 # URL-Checker Coding Challenge
 
+View on GitHub Pages <https://0scarb.github.io/url-coding-challenge/>
+
 You can run the web-app by serving the repository's root directory
 from a static file server. If you have python installed, you can run:
 ```sh
