@@ -1,0 +1,18 @@
+{
+    "name": "url-coding-challenge",
+    "description": "URL-checker application for a job application coding challenge.",
+    "version": "1.0.1",
+    "scripts": {
+        "serve": "python3 -m http.server -b localhost 8080",
+        "serve-background": "kill -9 $( cat server.pid ) 2>/dev/null; sh -c 'echo $$ > server.pid && exec python3 -m http.server -b localhost 8080 1>server.log 2>server.log' &",
+        "serve-background-stop": "kill $( cat server.pid )"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/0scarB/url-coding-challenge.git"
+    },
+    "homepage": "https://0scarb.github.io/url-coding-challenge/",
+    "devDependencies": {
+        "typescript": "6.0.3"
+    }
+}
