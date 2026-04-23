@@ -131,8 +131,25 @@ function updateUi() {
     inputEl.reportValidity();
 }
 
+function checkUrlFormat(url: string): boolean {
+    try {
+        let urlObj = new URL(url);
+        if (urlObj.protocol !== "https:" && urlObj.protocol !== "http:") {
+            state = State.NOT_HTTP_OR_HTTPS;
+            updateUi();
+            return false;
+        }
+    } catch (error) {
+        state = State.INVALID_FORMAT;
+        updateUi();
+        return false;
+    }
+    return true;
+}
+
 async function doRequest() {
     const url = inputEl.value;
+    if (!checkUrlFormat(url)) return;
 
     let responseStatus = -1;
     let responseBody   = "";
@@ -180,20 +197,7 @@ async function doRequest() {
 
 async function update() {
     const url = inputEl.value;
-
-    // Check the URL's format
-    try {
-        let urlObj = new URL(url);
-        if (urlObj.protocol !== "https:" && urlObj.protocol !== "http:") {
-            state = State.NOT_HTTP_OR_HTTPS;
-            updateUi();
-            return;
-        }
-    } catch (error) {
-        state = State.INVALID_FORMAT;
-        updateUi();
-        return;
-    }
+    if (!checkUrlFormat(url)) return;
 
     // Throttle requests and schedule them for later with setTimeout, if needed ...
     const timestamp = Date.now();
