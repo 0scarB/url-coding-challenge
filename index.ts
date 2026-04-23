@@ -15,6 +15,7 @@ enum State {
     NOT_FOUND,
     POINTS_TO_FILE,
     POINTS_TO_DIR,  
+    REQUEST_FAILED,
     BUG,
 }
 
@@ -30,9 +31,37 @@ const API_THROTTLE_INTERVAL_IN_MS = 2000;
 const API_BASE_URL                = "https://bogus.com/api/";
 const API_URL_TYPE_ENDPOINT_PATH  = "url-type";
 
-const inputEl            = document.getElementById("url-input") as HTMLInputElement;
-const pendingStatusMsgEl = document.getElementById("url-input-pending-status-msg");
-const successStatusMsgEl = document.getElementById("url-input-success-status-msg");
+function crash(errorMsg: string): never {
+    // Display the error message at the top of the viewport
+    // so it's visible when the developer console is closed.
+    const errorDiv = document.createElement("div");
+    errorDiv.style.position        = "fixed";
+    errorDiv.style.top             = "0";
+    errorDiv.style.left            = "0";
+    errorDiv.style.color           = "white";
+    errorDiv.style.backgroundColor = "red";
+    errorDiv.style.fontWeight      = "bold";
+    errorDiv.textContent = errorMsg;
+    document.body.appendChild(errorDiv);
+
+    throw new Error(errorMsg);
+}
+
+function getElementByIdOrCrash(id: string): HTMLElement {
+    const el = document.getElementById(id);
+    if (!el) crash(`No element with id="${id}"!`);
+    return el;
+}
+function getInputElementByIdOrCrash(id: string): HTMLInputElement {
+    const el = getElementByIdOrCrash(id);
+    if (!(el instanceof HTMLInputElement))
+        crash(`Element with id="${id}" is not an input element!`);
+    return el as HTMLInputElement;
+}
+
+const inputEl            = getInputElementByIdOrCrash("url-input");
+const pendingStatusMsgEl = getElementByIdOrCrash("url-input-pending-status-msg");
+const successStatusMsgEl = getElementByIdOrCrash("url-input-success-status-msg");
 
 let state: State = State.EMPTY_URL;
 let requestTimestamp   = -1;
@@ -58,7 +87,7 @@ async function fetchMock(url: string, options: fetchOptions): Promise<Response> 
         }
     } else {
         console.info(`Mock response: 404 Not Found`);
-        throw {status: HTTP_STATUS_NOT_FOUND};
+        return new Response("", {status: HTTP_STATUS_NOT_FOUND});
     }
 }
 
@@ -90,6 +119,11 @@ function updateUi() {
         case State.POINTS_TO_DIR:
             successStatusMsgEl.textContent = "URL points to folder.";
             break;
+        case State.REQUEST_FAILED:
+            inputEl.setCustomValidity(
+                "Request failed. There may be a problem with the server. " +
+                "Please notify developers!");
+            break;
         case State.BUG:
             inputEl.setCustomValidity("Encountered a bug. Please notify developers!");
             break;
@@ -120,7 +154,9 @@ async function doRequest() {
         if (response.status === HTTP_STATUS_OK)
             responseBody = await response.text();
     } catch (error) {
-        responseStatus = error.status;
+        state = State.REQUEST_FAILED;
+        updateUi();
+        return;
     }
 
     // Return early, if the URL no longer matches the most recent input

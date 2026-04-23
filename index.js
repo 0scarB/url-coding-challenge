@@ -8,33 +8,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __generator = (this && this.__generator) || function (thisArg, body) {
-    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
-    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
-    function verb(n) { return function (v) { return step([n, v]); }; }
-    function step(op) {
-        if (f) throw new TypeError("Generator is already executing.");
-        while (_) try {
-            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
-            if (y = 0, t) op = [op[0] & 2, t.value];
-            switch (op[0]) {
-                case 0: case 1: t = op; break;
-                case 4: _.label++; return { value: op[1], done: false };
-                case 5: _.label++; y = op[1]; op = [0]; continue;
-                case 7: op = _.ops.pop(); _.trys.pop(); continue;
-                default:
-                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
-                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
-                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
-                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
-                    if (t[2]) _.ops.pop();
-                    _.trys.pop(); continue;
-            }
-            op = body.call(thisArg, _);
-        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
-        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
-    }
-};
 var State;
 (function (State) {
     State[State["EMPTY_URL"] = 0] = "EMPTY_URL";
@@ -45,58 +18,74 @@ var State;
     State[State["NOT_FOUND"] = 5] = "NOT_FOUND";
     State[State["POINTS_TO_FILE"] = 6] = "POINTS_TO_FILE";
     State[State["POINTS_TO_DIR"] = 7] = "POINTS_TO_DIR";
-    State[State["BUG"] = 8] = "BUG";
+    State[State["REQUEST_FAILED"] = 8] = "REQUEST_FAILED";
+    State[State["BUG"] = 9] = "BUG";
 })(State || (State = {}));
-var MOCK_FETCH = true;
-var MOCK_FETCH_DELAY_IN_MS = 1000;
-var MOCK_FETCH_EXISTENT_DOMAINS = ["exists.com", "tuta.com", "xkcd.com", "google.com"];
-var MOCK_FETCH_DIR_SUFFIX = "/";
-var HTTP_STATUS_OK = 200;
-var HTTP_STATUS_NOT_FOUND = 404;
-var API_THROTTLE_INTERVAL_IN_MS = 2000;
-var API_BASE_URL = "https://bogus.com/api/";
-var API_URL_TYPE_ENDPOINT_PATH = "url-type";
-var inputEl = document.getElementById("url-input");
-var pendingStatusMsgEl = document.getElementById("url-input-pending-status-msg");
-var successStatusMsgEl = document.getElementById("url-input-success-status-msg");
-var state = State.EMPTY_URL;
-var requestTimestamp = -1;
-var doRequestTimeoutId = -1;
+const MOCK_FETCH = true;
+const MOCK_FETCH_DELAY_IN_MS = 1000;
+const MOCK_FETCH_EXISTENT_DOMAINS = ["exists.com", "tuta.com", "xkcd.com", "google.com"];
+const MOCK_FETCH_DIR_SUFFIX = "/";
+const HTTP_STATUS_OK = 200;
+const HTTP_STATUS_NOT_FOUND = 404;
+const API_THROTTLE_INTERVAL_IN_MS = 2000;
+const API_BASE_URL = "https://bogus.com/api/";
+const API_URL_TYPE_ENDPOINT_PATH = "url-type";
+function crash(errorMsg) {
+    // Display the error message at the top of the viewport
+    // so it's visible when the developer console is closed.
+    const errorDiv = document.createElement("div");
+    errorDiv.style.position = "fixed";
+    errorDiv.style.top = "0";
+    errorDiv.style.left = "0";
+    errorDiv.style.color = "white";
+    errorDiv.style.backgroundColor = "red";
+    errorDiv.style.fontWeight = "bold";
+    errorDiv.textContent = errorMsg;
+    document.body.appendChild(errorDiv);
+    throw new Error(errorMsg);
+}
+function getElementByIdOrCrash(id) {
+    const el = document.getElementById(id);
+    if (!el)
+        crash(`No element with id="${id}"!`);
+    return el;
+}
+function getInputElementByIdOrCrash(id) {
+    const el = getElementByIdOrCrash(id);
+    if (!(el instanceof HTMLInputElement))
+        crash(`Element with id="${id}" is not an input element!`);
+    return el;
+}
+const inputEl = getInputElementByIdOrCrash("url-input");
+const pendingStatusMsgEl = getElementByIdOrCrash("url-input-pending-status-msg");
+const successStatusMsgEl = getElementByIdOrCrash("url-input-success-status-msg");
+let state = State.EMPTY_URL;
+let requestTimestamp = -1;
+let doRequestTimeoutId = -1;
 function delay(milliseconds) {
-    return __awaiter(this, void 0, void 0, function () {
-        return __generator(this, function (_a) {
-            return [2 /*return*/, new Promise(function (resolve) { return setTimeout(resolve, milliseconds); })];
-        });
+    return __awaiter(this, void 0, void 0, function* () {
+        return new Promise(resolve => setTimeout(resolve, milliseconds));
     });
 }
 function fetchMock(url, options) {
-    return __awaiter(this, void 0, void 0, function () {
-        var urlToCheck;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    console.info("Mock fetch(\"".concat(url, "\", ").concat(JSON.stringify(options), ")"));
-                    return [4 /*yield*/, delay(MOCK_FETCH_DELAY_IN_MS)];
-                case 1:
-                    _a.sent();
-                    urlToCheck = options.body;
-                    if (MOCK_FETCH_EXISTENT_DOMAINS.includes(new URL(urlToCheck).hostname)) {
-                        if (urlToCheck.endsWith(MOCK_FETCH_DIR_SUFFIX)) {
-                            console.info("Mock response body: dir");
-                            return [2 /*return*/, new Response("dir")];
-                        }
-                        else {
-                            console.info("Mock response body: file");
-                            return [2 /*return*/, new Response("file")];
-                        }
-                    }
-                    else {
-                        console.info("Mock response: 404 Not Found");
-                        throw { status: HTTP_STATUS_NOT_FOUND };
-                    }
-                    return [2 /*return*/];
+    return __awaiter(this, void 0, void 0, function* () {
+        console.info(`Mock fetch("${url}", ${JSON.stringify(options)})`);
+        yield delay(MOCK_FETCH_DELAY_IN_MS);
+        const urlToCheck = options.body;
+        if (MOCK_FETCH_EXISTENT_DOMAINS.includes(new URL(urlToCheck).hostname)) {
+            if (urlToCheck.endsWith(MOCK_FETCH_DIR_SUFFIX)) {
+                console.info(`Mock response body: dir`);
+                return new Response("dir");
             }
-        });
+            else {
+                console.info(`Mock response body: file`);
+                return new Response("file");
+            }
+        }
+        else {
+            console.info(`Mock response: 404 Not Found`);
+            return new Response("", { status: HTTP_STATUS_NOT_FOUND });
+        }
     });
 }
 function updateUi() {
@@ -127,6 +116,10 @@ function updateUi() {
         case State.POINTS_TO_DIR:
             successStatusMsgEl.textContent = "URL points to folder.";
             break;
+        case State.REQUEST_FAILED:
+            inputEl.setCustomValidity("Request failed. There may be a problem with the server. " +
+                "Please notify developers!");
+            break;
         case State.BUG:
             inputEl.setCustomValidity("Encountered a bug. Please notify developers!");
             break;
@@ -134,96 +127,79 @@ function updateUi() {
     inputEl.reportValidity();
 }
 function doRequest() {
-    return __awaiter(this, void 0, void 0, function () {
-        var url, responseStatus, responseBody, responsePromise, response, error_1;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    url = inputEl.value;
-                    responseStatus = -1;
-                    responseBody = "";
-                    _a.label = 1;
-                case 1:
-                    _a.trys.push([1, 5, , 6]);
-                    requestTimestamp = Date.now();
-                    responsePromise = (MOCK_FETCH ? fetchMock : fetch)(API_BASE_URL + API_URL_TYPE_ENDPOINT_PATH, {
-                        method: "POST",
-                        headers: { "Content-Type": "text/plain" },
-                        body: url
-                    });
-                    state = State.AWAITING_API_URL_TYPE_RESPONSE;
-                    updateUi();
-                    return [4 /*yield*/, responsePromise];
-                case 2:
-                    response = _a.sent();
-                    responseStatus = response.status;
-                    if (!(response.status === HTTP_STATUS_OK)) return [3 /*break*/, 4];
-                    return [4 /*yield*/, response.text()];
-                case 3:
-                    responseBody = _a.sent();
-                    _a.label = 4;
-                case 4: return [3 /*break*/, 6];
-                case 5:
-                    error_1 = _a.sent();
-                    responseStatus = error_1.status;
-                    return [3 /*break*/, 6];
-                case 6:
-                    // Return early, if the URL no longer matches the most recent input
-                    if (url !== inputEl.value)
-                        return [2 /*return*/];
-                    if (responseStatus === HTTP_STATUS_OK && responseBody === "file") {
-                        state = State.POINTS_TO_FILE;
-                    }
-                    else if (responseStatus === HTTP_STATUS_OK && responseBody === "dir") {
-                        state = State.POINTS_TO_DIR;
-                    }
-                    else if (responseStatus === HTTP_STATUS_NOT_FOUND) {
-                        state = State.NOT_FOUND;
-                    }
-                    else {
-                        state = State.BUG;
-                        updateUi();
-                        return [2 /*return*/];
-                    }
-                    updateUi();
-                    return [2 /*return*/];
-            }
-        });
+    return __awaiter(this, void 0, void 0, function* () {
+        const url = inputEl.value;
+        let responseStatus = -1;
+        let responseBody = "";
+        try {
+            requestTimestamp = Date.now();
+            const responsePromise = (MOCK_FETCH ? fetchMock : fetch)(API_BASE_URL + API_URL_TYPE_ENDPOINT_PATH, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain" },
+                body: url,
+            });
+            state = State.AWAITING_API_URL_TYPE_RESPONSE;
+            updateUi();
+            const response = yield responsePromise;
+            responseStatus = response.status;
+            if (response.status === HTTP_STATUS_OK)
+                responseBody = yield response.text();
+        }
+        catch (error) {
+            state = State.REQUEST_FAILED;
+            updateUi();
+            return;
+        }
+        // Return early, if the URL no longer matches the most recent input
+        if (url !== inputEl.value)
+            return;
+        if (responseStatus === HTTP_STATUS_OK && responseBody === "file") {
+            state = State.POINTS_TO_FILE;
+        }
+        else if (responseStatus === HTTP_STATUS_OK && responseBody === "dir") {
+            state = State.POINTS_TO_DIR;
+        }
+        else if (responseStatus === HTTP_STATUS_NOT_FOUND) {
+            state = State.NOT_FOUND;
+        }
+        else {
+            state = State.BUG;
+            updateUi();
+            return;
+        }
+        updateUi();
     });
 }
 function update() {
-    return __awaiter(this, void 0, void 0, function () {
-        var url, urlObj, timestamp;
-        return __generator(this, function (_a) {
-            url = inputEl.value;
-            // Check the URL's format
-            try {
-                urlObj = new URL(url);
-                if (urlObj.protocol !== "https:" && urlObj.protocol !== "http:") {
-                    state = State.NOT_HTTP_OR_HTTPS;
-                    updateUi();
-                    return [2 /*return*/];
-                }
-            }
-            catch (error) {
-                state = State.INVALID_FORMAT;
+    return __awaiter(this, void 0, void 0, function* () {
+        const url = inputEl.value;
+        // Check the URL's format
+        try {
+            let urlObj = new URL(url);
+            if (urlObj.protocol !== "https:" && urlObj.protocol !== "http:") {
+                state = State.NOT_HTTP_OR_HTTPS;
                 updateUi();
-                return [2 /*return*/];
+                return;
             }
-            timestamp = Date.now();
-            // NOTE: clearTimeout does nothing if doRequestTimeoutId is not an active timeout ID
-            clearTimeout(doRequestTimeoutId);
-            if (timestamp - requestTimestamp < API_THROTTLE_INTERVAL_IN_MS) {
-                doRequestTimeoutId =
-                    setTimeout(doRequest, requestTimestamp + API_THROTTLE_INTERVAL_IN_MS - timestamp);
-                state = State.REQUEST_THROTTLED;
-                updateUi();
-                return [2 /*return*/];
-            }
-            // ... otherwise, do the request immediately
-            doRequest();
-            return [2 /*return*/];
-        });
+        }
+        catch (error) {
+            state = State.INVALID_FORMAT;
+            updateUi();
+            return;
+        }
+        // Throttle requests and schedule them for later with setTimeout, if needed ...
+        const timestamp = Date.now();
+        // NOTE: clearTimeout does nothing if doRequestTimeoutId is not an active timeout ID
+        clearTimeout(doRequestTimeoutId);
+        if (timestamp - requestTimestamp < API_THROTTLE_INTERVAL_IN_MS) {
+            doRequestTimeoutId =
+                setTimeout(doRequest, requestTimestamp + API_THROTTLE_INTERVAL_IN_MS - timestamp);
+            state = State.REQUEST_THROTTLED;
+            updateUi();
+            return;
+        }
+        // ... otherwise, do the request immediately
+        doRequest();
     });
 }
 inputEl.addEventListener("input", update);

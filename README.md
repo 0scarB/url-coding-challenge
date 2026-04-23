@@ -2,14 +2,39 @@
 
 View on GitHub Pages <https://0scarb.github.io/url-coding-challenge/>
 
-You can run the web-app by serving the repository's root directory
-from a static file server. If you have python installed, you can run:
-```sh
-python3 -m http.server -b localhost 8080
-```
-then navigate to <http://localhost:8080> in your browser.
-
 Time taken: 2h 54m
+
+
+## Development Setup
+
+Run `npm install --include=dev` to install the correct version of typescript as
+a npm-package developer dependency. If this fails, ensure you can run the commands
+`npm` and `node` in the terminal.
+
+If things continue to fail, you may be using the wrong version of NodeJS and
+`npm`.  Read `.nvmrc` to view the project's NodeJS.  If you have `nvm` -- the
+Node Version Manager <https://github.com/nvm-sh/nvm> -- on your path, I
+recommend you first run `nvm install` or `nvm use` to switch to the project's
+NodeJS version, before running `npm` commands. **Ensure you are using the
+project's version of NodeJS and `npm` before reporting issues.**
+
+You need to have Python installed and be able to run the `python3` in the
+terminal to use the "serve" commands, described below.
+
+
+## Development
+
+Run `npm exec tsc` to compile `index.ts` to `index.js`.
+
+Run `npm run serve` to serve the web-app locally. To open it, navigate to
+<http://localhost:8080> in your browser.<br>
+Run `npm run serve-background` to start the server in a background process,
+allowing you to continue using the terminal.<br>
+Run `npm run serve-background-stop` to terminate the background process.<br>
+The output of the background process is logged to `server.log`. Run `tail -f
+server.log` to follow it.<br>
+(These commands use Python's `http.server' module. This requires you to have a
+version Python 3 installed.)
 
 
 ## Implementation
@@ -35,9 +60,4 @@ within this interval are rescheduled to run after the interval ends with
 `setTimeout`. Calls to `clearTimeout` ensure that only a single request is
 rescheduled to run that the end of the interval.
 
-
-## Development
-
-You can compile `index.ts` to `index.js` by running `compile-typescript.sh`.
-To do this you need `tsc` on your PATH.
 
